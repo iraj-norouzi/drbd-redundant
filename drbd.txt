@@ -1,0 +1,375 @@
+1. config ethernet's
+=> IBSng-A
+#vim /etc/network/interfaces
+---
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+	address 192.168.43.2
+	gateway 192.168.43.1
+	netmask 255.255.255.0
+
+# DRBD inet
+auto eth1
+iface eth1 inet static
+	address 10.10.10.1
+	netmask 255.255.255.252
+
+=> IBSng-B
+#vim /etc/network/interfaces
+---
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+        address 192.168.43.3
+        gateway 192.168.43.1
+        netmask 255.255.255.0
+
+# DRBD inet
+auto eth1
+iface eth1 inet static
+        address 10.10.10.2
+        netmask 255.255.255.252
+
+2. change hostname
+=> IBSng-A
+# vim /etc/hostname
+IBSng-A
+# /etc/init.d/hostname.sh
+
+=> IBSng-B
+# vim /etc/hostname
+IBSng-B
+# /etc/init.d/hostname.sh
+
+2. edit hosts
+=> IBSng-A
+#vim /etc/hosts
+127.0.0.1       localhost
+127.0.1.1       Debian-main.local       Debian-main
+10.10.10.2      IBSng-B
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+# ping IBSng-B
+
+=> IBSng-B
+127.0.0.1       localhost
+127.0.1.1       Debian-main.local       Debian-main
+10.10.10.1      IBSng-A
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+# ping IBsng-A
+
+3. generate public key and copy to another server
+=> IBSng-A
+root@IBSng-A:~# ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+3e:b7:8c:05:68:79:54:c5:02:41:75:97:8e:42:2c:e6 root@IBSng-A
+The key's randomart image is:
++--[ RSA 2048]----+
+|       .+=ooo .. |
+|        o.+....  |
+|       o.o . o   |
+|       +E . . .  |
+|      + S  .     |
+|     . o .       |
+|        o o      |
+|         * .     |
+|        . o      |
++-----------------+
+root@IBSng-A:~# ping IBSng-B
+PING IBSng-B (10.10.10.2) 56(84) bytes of data.
+64 bytes from IBSng-B (10.10.10.2): icmp_req=1 ttl=64 time=0.783 ms
+^C
+--- IBSng-B ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.783/0.783/0.783/0.000 ms
+
+root@IBSng-A:~# ssh-copy-id root@IBSng-B
+The authenticity of host 'ibsng-b (10.10.10.2)' can't be established.
+ECDSA key fingerprint is 3e:38:f9:36:8e:93:2f:36:8b:2a:86:f9:43:51:3e:c0.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'ibsng-b,10.10.10.2' (ECDSA) to the list of known hosts.
+root@ibsng-b's password: 
+Now try logging into the machine, with "ssh 'root@IBSng-B'", and check in:
+
+  ~/.ssh/authorized_keys
+
+to make sure we haven't added extra keys that you weren't expecting.
+
+=> IBSng-B
+root@IBSng-B:~# ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+35:45:d0:5f:50:ab:0c:7e:81:59:44:e5:53:15:94:4f root@IBSng-B
+The key's randomart image is:
++--[ RSA 2048]----+
+|          .+=++*B|
+|           .= ..E|
+|          o+ o *.|
+|         ...o + o|
+|        S  . +   |
+|            .    |
+|                 |
+|                 |
+|                 |
++-----------------+
+
+root@IBSng-B:~# ssh-copy-id root@IBSng-A
+The authenticity of host 'ibsng-a (10.10.10.1)' can't be established.
+ECDSA key fingerprint is 3e:38:f9:36:8e:93:2f:36:8b:2a:86:f9:43:51:3e:c0.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'ibsng-a,10.10.10.1' (ECDSA) to the list of known hosts.
+root@ibsng-a's password: 
+Now try logging into the machine, with "ssh 'root@IBSng-A'", and check in:
+
+  ~/.ssh/authorized_keys
+
+to make sure we haven't added extra keys that you weren't expecting.
+
+3. create a partition and move database to this partition
+(ham dar server A va ham dar server B).
+=> IBSng-A
+root@IBSng-A:~# cp -rp /var/lib/postgresql/9.1/ /mnt/
+
+4. baraye inke tedade block'ha dar partition drbd1 va postgresql yeki bashand be soorate zir 
+amal mikonim(inkar ra dar har do server anjam dahid):
+=> IBSng-A
+
+root@IBSng-A:~# fdisk /dev/sdc 
+Device contains neither a valid DOS partition table, nor Sun, SGI or OSF disklabel
+Building a new DOS disklabel with disk identifier 0xc736e251.
+Changes will remain in memory only, until you decide to write them.
+After that, of course, the previous content won't be recoverable.
+
+Warning: invalid flag 0x0000 of partition table 4 will be corrected by w(rite)
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): 
+Using default response p
+Partition number (1-4, default 1): 
+Using default value 1
+First sector (2048-20971519, default 2048): 
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-20971519, default 20971519): 16775168
+
+Command (m for help): v
+Remaining 4198398 unallocated 512-byte sectors
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+5. bar rooye har 2 server meghdare block'hara zero mikonim:
+=> IBSng-A
+root@IBSng-A:~# dd if=/dev/zero of=/dev/sdc1 bs=2M count=20
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 3.38181 s, 318 MB/s
+
+=> IBSng-B
+root@IBSng-B:~# dd if=/dev/zero of=/dev/sdc1 bs=2M count=20
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB) copied, 3.38181 s, 318 MB/s
+
+6. bar rooye har 2 server package drbd8-utils ra nasb mikonim:
+root@IBSng-A:~# apt-get install drbd8-utils
+root@IBSng-B:~# apt-get install drbd8-utils
+
+7. bar rooye har 2 server marahele zir ra anjam dahid:
+cd /etc/drbd.d/
+root@IBSng-A:/etc/drbd.d# mv global_common.conf /home/global_common.conf.origin
+file zir ra taghir dahid:
+root@IBSng-A:/etc/drbd.d# vim ../drbd.conf 
+# You can find an example in  /usr/share/doc/drbd.../drbd.conf.example
+
+#include "drbd.d/global_common.conf";
+include "drbd.d/*.res";
+
+root@IBSng-A:~# cp /usr/local/src/tools/file/replicate/drbd/r0.res /etc/drbd.d/
+root@IBSng-A:~= cp /usr/local/src/tools/file/replicate/drbd/global_common.conf /etc/drbd.d/ 
+
+file r0.res ra be soorate zir config mikonim:
+root@IBSng-A:~# vim /etc/drbd.d/r0.res
+resource r0 {
+    net {
+        after-sb-0pri discard-least-changes;
+        after-sb-1pri call-pri-lost-after-sb;
+        after-sb-2pri call-pri-lost-after-sb;
+        }
+
+
+  on IBSng-A {
+    device    /dev/drbd1;
+    disk      /dev/sdc1;
+    address   10.10.10.1:7789;
+    meta-disk internal;
+  }
+  on IBSng-B {
+    device    /dev/drbd1;
+    disk      /dev/sdc1;
+    address   10.10.10.2:7789;
+    meta-disk internal;
+  }
+}
+
+7. start service drbd
+ham zaman bar rooye 2 server dastoore zir ra ejra mikonim:
+/etc/init.d/drbd restart
+agar bar rooye har 2 server dastoore drbd-overview ra bezanim:
+=> IBSng-A
+root@IBSng-A:~# drbd-overview 
+  1:r0  Unconfigured . . . . 
+
+=> IBSng-B
+root@IBSng-B:~# drbd-overview 
+  1:r0  Unconfigured . . . . 
+
+8. dastoorate zir ra bar rooye har 2 server ejra mikonim:
+=> IBSng-A
+root@IBSng-A:~# drbdadm create-md r0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  --==  Thank you for participating in the global usage survey  ==--
+The server's response is:
+
+node already registered
+Writing meta data...
+initializing activity log
+NOT initialized bitmap
+New drbd meta data block successfully created.
+success
+root@IBSng-A:~# drbd-overview 
+  1:r0  Unconfigured . . . . 
+root@IBSng-A:~# drbd-overview 
+  1:r0  Unconfigured . . . . 
+
+=> IBSng-B
+root@IBSng-B:~# drbdadm create-md r0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  --==  Thank you for participating in the global usage survey  ==--
+The server's response is:
+
+node already registered
+Writing meta data...
+initializing activity log
+NOT initialized bitmap
+New drbd meta data block successfully created.
+success
+root@IBSng-B:~# drbd-overview 
+  1:r0  Unconfigured . . . . 
+
+8. attach mikonim:
+=> IBSng-A
+root@IBSng-A:~# drbdadm attach r0
+root@IBSng-A:~# drbd-overview 
+  1:r0  StandAlone Secondary/Unknown Inconsistent/DUnknown r----s 
+root@IBSng-A:~# drbdadm syncer r0
+root@IBSng-A:~# drbd-overview 
+  1:r0  StandAlone Secondary/Unknown Inconsistent/DUnknown r----s 
+root@IBSng-A:~# drbdadm connect r0
+root@IBSng-A:~# drbd-overview 
+  1:r0  WFConnection Secondary/Unknown Inconsistent/DUnknown B r----s 
+
+=> IBSng-B
+root@IBSng-B:~# drbdadm attach r0
+root@IBSng-B:~# drbd-overview 
+  1:r0  StandAlone Secondary/Unknown Inconsistent/DUnknown r----s 
+root@IBSng-B:~# drbdadm syncer r0
+root@IBSng-B:~# drbdadm connect r0
+root@IBSng-B:~# drbd-overview 
+  1:r0  Connected Secondary/Secondary Inconsistent/Inconsistent B r----- 
+
+9. faghat bar rooye serveri ke gharar ast primary shavad dastoore zir ra vared konid:
+root@IBSng-A:~# drbdadm -- --overwrite-data-of-peer primary r0
+root@IBSng-A:~# drbd-overview 
+  1:r0  SyncSource Primary/Secondary UpToDate/Inconsistent B r----- 
+	[>....................] sync'ed:  0.1% (8184/8188)Mfinish: 1:27:19 speed: 1,536 (1,536) K/sec
+
+10. (mohem) montazer mishavim ta sync shavand.
+mitavan ba drbd-overview sync shodan ra check kard:
+=> IBSng-A
+root@IBSng-A:~# drbd-overview 
+  1:r0  Connected Primary/Secondary UpToDate/UpToDate B r----- 
+
+11. pas az payan sync shodan:
+dar server primary /dev/drbd1 ra format mikonim va mount mikonim bar rooye directory /var/lib/postgresql/
+root@IBSng-A:~# mkfs.xfs /dev/drbd1 
+meta-data=/dev/drbd1             isize=256    agcount=4, agsize=524142 blks
+         =                       sectsz=512   attr=2, projid32bit=0
+data     =                       bsize=4096   blocks=2096567, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+root@IBSng-A:~# mount /dev/drbd1 /var/lib/postgresql/
+
+=> IBSng-A
+root@IBSng-B:~# mount /dev/drbd1 /var/lib/postgresql/
+root@IBSng-B:~# cp -rp /mnt/9.1/ /var/lib/postgresql/
+root@IBSng-B:~# /etc/init.d/postgresql restart
